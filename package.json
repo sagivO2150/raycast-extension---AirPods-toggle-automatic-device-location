@@ -1,0 +1,166 @@
+{
+  "$schema": "https://www.raycast.com/schemas/extension.json",
+  "name": "airpods-noise-control-auto",
+  "title": "AirPods Noise Control Auto",
+  "description": "Auto-detecting AirPods extension that switches between Off, Transparency, Adaptive or Noise Cancellation. Automatically detects AirPods Pro vs Max and configures optimal settings.",
+  "icon": "extension_icon.png",
+  "author": "sagivO2150",
+  "contributors": [
+    "chrahe",
+    "hllvc",
+    "Juanra"
+  ],
+  "categories": [
+    "Media",
+    "System"
+  ],
+  "license": "MIT",
+  "commands": [
+    {
+      "name": "index",
+      "title": "Sagiv's Noise Toggle",
+      "subtitle": "Auto-detects AirPods type • Noise Control Toggle",
+      "description": "Sagiv's custom auto-detecting noise control toggle for AirPods Pro/Max.",
+      "mode": "no-view",
+      "keywords": [
+        "airpods",
+        "noise",
+        "cancellation",
+        "transparency",
+        "isolation",
+        "anc",
+        "adaptive"
+      ],
+      "preferences": [
+        {
+          "name": "optionOne",
+          "title": "Option One 🔵",
+          "description": "First option to switch between.",
+          "type": "dropdown",
+          "default": "Noise Cancellation",
+          "data": [
+            {
+              "title": "Off",
+              "value": "Off"
+            },
+            {
+              "title": "Transparency",
+              "value": "Transparency"
+            },
+            {
+              "title": "Adaptive (only if you have)",
+              "value": "Adaptive"
+            },
+            {
+              "title": "Noise Cancellation",
+              "value": "Noise Cancellation"
+            }
+          ],
+          "required": true
+        },
+        {
+          "name": "optionTwo",
+          "title": "Option Two 🟢",
+          "description": "Second option to switch between.",
+          "type": "dropdown",
+          "default": "Transparency",
+          "data": [
+            {
+              "title": "Off",
+              "value": "Off"
+            },
+            {
+              "title": "Transparency",
+              "value": "Transparency"
+            },
+            {
+              "title": "Adaptive (only if you have)",
+              "value": "Adaptive"
+            },
+            {
+              "title": "Noise Cancellation",
+              "value": "Noise Cancellation"
+            }
+          ],
+          "required": true
+        },
+        {
+          "title": "Preview",
+          "name": "showHudNC",
+          "label": "Show HUD For Noise Control",
+          "description": "Show HUD feedback on noise control change.",
+          "type": "checkbox",
+          "default": false,
+          "required": true
+        }
+      ]
+    }
+  ],
+  "preferences": [
+    {
+      "name": "airpodsType",
+      "title": "AirPods Type (Auto-detected)",
+      "description": "Your AirPods model will be automatically detected. This setting is for manual override only.",
+      "type": "dropdown",
+      "required": false,
+      "data": [
+        {
+          "title": "AirPods Pro",
+          "value": "AirPods Pro"
+        },
+        {
+          "title": "AirPods Max",
+          "value": "AirPods Max"
+        }
+      ]
+    },
+    {
+      "name": "airpodsIndex",
+      "title": "AirPods List Position (Auto-detected)",
+      "description": "The position of your AirPods in the Sound menu will be automatically detected (defaults to position 4). This setting is for manual override only.",
+      "type": "textfield",
+      "required": false,
+      "placeholder": "Position of your AirPods in the Sound menu (1, 2, 3, ...)"
+    },
+    {
+      "name": "ccLoc",
+      "title": "Control Center Localization",
+      "description": "What is the name of the Control Center in your language/region?",
+      "type": "textfield",
+      "required": false,
+      "default": "Control Center",
+      "placeholder": "Control Centre, Kontrollzentrum, ..."
+    },
+    {
+      "name": "soundLoc",
+      "title": "Sound Menu Localization",
+      "description": "What is the name of the Sound menu (in Control Center) in your language/region?",
+      "type": "textfield",
+      "required": false,
+      "default": "Sound",
+      "placeholder": "Sound, Ton, ..."
+    }
+  ],
+  "dependencies": {
+    "@raycast/api": "^1.62.2",
+    "@raycast/utils": "^1.10.1"
+  },
+  "devDependencies": {
+    "@raycast/eslint-config": "^1.0.8",
+    "@types/node": "18.8.3",
+    "@types/react": "18.0.9",
+    "eslint": "^8.54.0",
+    "prettier": "^3.0.3",
+    "typescript": "^5.3.2"
+  },
+  "scripts": {
+    "build": "ray build -e dist",
+    "dev": "ray develop",
+    "fix-lint": "ray lint --fix",
+    "lint": "ray lint",
+    "publish": "ray publish"
+  },
+  "platforms": [
+    "macOS"
+  ]
+}

@@ -1,0 +1,104 @@
+# Raycast Freeze Issue - Stuck Processes Explanation
+
+## Problem Summary
+The Raycast app was stuck because your AirPods extension was repeatedly executing an AppleScript command (`osascript`) to detect the connected AirPods device. The AppleScript command execution was timing out repeatedly without an explicit timeout configured (showing "Command timed out after undefined milliseconds: osascript"). This repeated timeout caused repeated failures and likely caused the Raycast app to become stuck in a problematic state.
+
+## The AppleScript Command
+The command itself uses `system_profiler SPAudioDataType` piped with grep and sed commands to identify the default audio output device:
+```applescript
+system_profiler SPAudioDataType | grep -B 10 'Default Output Device: Yes' | grep '^[[:space:]]*[^[:space:]].*:$' | tail -1 | sed 's/:$//' | sed 's/^[[:space:]]*//'
+```
+
+The command works fine and runs quickly when executed standalone in the terminal, which suggests the issue could be related to the script environment or Raycast's handling of long-running extension commands or AppleScript calls.
+
+## What Made Raycast Get Stuck
+
+### The Root Cause Chain:
+1. **Your AirPods extension** was repeatedly calling `runAppleScript()` with the system profiler command
+2. **The AppleScript execution was timing out** - but not cleanly. The error showed "Command timed out after undefined milliseconds" which suggests the timeout mechanism itself had issues.
+3. **Raycast's extension system** kept retrying the failed operation, creating a **cascade of stuck processes**.
+
+### Why Raycast Became Completely Unresponsive:
+
+1. **Process Accumulation**: Each timeout created a stuck `osascript` process that wasn't properly cleaned up
+2. **Resource Exhaustion**: Multiple stuck processes consumed system resources (CPU/memory)
+3. **Extension System Deadlock**: Raycast's extension runtime got into a deadlocked state where it couldn't:
+   - Stop the failing extension
+   - Start new extensions
+   - Even respond to quit commands
+4. **Process Tree Persistence**: Even after quitting Raycast, the stuck `osascript` processes remained, preventing Raycast from starting cleanly
+
+## What Was The Catalyst?
+
+The catalyst was likely one of these scenarios:
+- **macOS Audio System State Change**: Something changed in your audio setup (AirPods connected/disconnected, audio driver update, etc.)
+- **System Profiler Hang**: `system_profiler SPAudioDataType` occasionally hangs on macOS, especially during audio system transitions
+- **Race Condition**: Multiple rapid calls to the same system resource created a deadlock
+
+## How We Got It Unstuck
+
+### The Solution Process:
+1. **Process Identification**: 
+   ```bash
+   ps aux | grep osascript
+   ```
+   This revealed the stuck processes that were preventing Raycast from recovering.
+
+2. **Force Kill Stuck Processes**:
+   ```bash
+   sudo pkill -f osascript
+   ```
+   This cleared the process deadlock.
+
+3. **System Resource Cleanup**: Killing the processes freed up:
+   - CPU cycles
+   - Memory
+   - File descriptors
+   - Audio system locks
+
+### Why Normal App Quit Didn't Work:
+- **Child Process Independence**: The `osascript` processes were spawned as independent child processes
+- **System-Level Deadlock**: The audio system profiler was likely holding system-level locks
+- **Raycast Couldn't Self-Recover**: Raycast's main process was waiting for these stuck child processes to complete
+
+## Technical Deep Dive
+
+Looking at the Raycast utils code, `runAppleScript` uses:
+```javascript
+const spawnedPromise = getSpawnedPromise(spawned, { timeout: timeout ?? 10000 });
+```
+
+The `runAppleScript` implementation has a default timeout of 10000 milliseconds (10 seconds), and it should throw a timeout error if the command takes longer than that. However, your error showed "undefined milliseconds", suggesting:
+1. The timeout mechanism itself failed
+2. The process got stuck before the timeout could even be applied
+3. System-level deadlock prevented normal cleanup
+
+## Your Extension Code Analysis
+
+In your `detectConnectedAirPods` function in `/src/airpods-detector.ts`, `runAppleScript` is called without specifying a `timeout`:
+
+```typescript
+const deviceName = await runAppleScript<string>(script);
+```
+
+No explicit timeout configuration was found in the code for the AppleScript execution via `runAppleScript`.
+
+## Prevention Strategy
+
+This type of freeze typically happens when:
+- System profiler commands conflict with audio system state changes
+- Multiple rapid audio device queries happen simultaneously  
+- macOS audio subsystem is in a transitional state
+
+## Root Cause Summary
+
+The root cause was that your Raycast extension was triggering AppleScript commands that repeatedly timed out internally, blocking or destabilizing the Raycast app. The standalone system profiling command works well, which suggests the issue could be related to the script environment or Raycast's handling of long-running extension commands or AppleScript calls.
+
+## Potential Next Steps to Prevent the Problem:
+- Add explicit timeout handling in your extension's AppleScript execution and catch timeouts gracefully.
+- Avoid rapid repeated AppleScript calls; consider debouncing or caching results.
+- Investigate if Raycast extension API offers better methods or timeout parameters for AppleScript execution.
+
+For now, the fix involved killing the stuck Raycast process to restart it fresh. Your extension should be reviewed to handle AppleScript timeouts more robustly to avoid similar Raycast hang issues in the future.
+
+This is a classic example of how extension runtime issues can escalate to application-level deadlocks when system resources get involved!
