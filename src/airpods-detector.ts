@@ -89,7 +89,7 @@ export function getDefaultOptionsForAirPodsType(
     // AirPods Pro
     return {
       optionOne: "Noise Cancellation",
-      optionTwo: "Adaptive",
+      optionTwo: "Transparency",
     };
   }
 }

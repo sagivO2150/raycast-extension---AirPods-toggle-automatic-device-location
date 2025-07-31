@@ -111,10 +111,10 @@ export function getDefaultOptionsForAirPodsType(
     };
   } else {
     // AirPods Pro
-    console.log("🎧 AirPods Pro: Using Noise Cancellation ↔ Adaptive");
+    console.log("🎧 AirPods Pro: Using Noise Cancellation ↔ Transparency");
     return {
       optionOne: "Noise Cancellation",
-      optionTwo: "Adaptive",
+      optionTwo: "Transparency",
     };
   }
 }
