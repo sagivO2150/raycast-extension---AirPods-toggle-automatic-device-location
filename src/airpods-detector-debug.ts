@@ -308,6 +308,24 @@ export async function detectConnectedAirPods(
       };
     }
 
+    // Enhanced fallback: Check for other Apple audio devices that might support noise control
+    if (cleanDeviceName.toLowerCase().includes("beats") && 
+        (cleanDeviceName.toLowerCase().includes("studio") || cleanDeviceName.toLowerCase().includes("solo"))) {
+      console.log("✅ Found Beats device with potential noise control support");
+      
+      let detectedPosition = prefs?.airpodsIndex
+        ? parseInt(prefs.airpodsIndex.toString())
+        : 4;
+
+      // Treat as AirPods Pro for noise control options
+      return {
+        isConnected: true,
+        deviceName: cleanDeviceName,
+        airpodsType: "AirPods Pro",
+        position: detectedPosition,
+      };
+    }
+
     // Not an AirPods device
     console.log("❌ Not an AirPods device");
     return {
