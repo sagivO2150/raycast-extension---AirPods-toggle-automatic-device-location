@@ -1,4 +1,4 @@
-import { closeMainWindow, getPreferenceValues, showHUD } from "@raycast/api";
+import { closeMainWindow, getPreferenceValues, showHUD, LocalStorage } from "@raycast/api";
 import { execAirPodsMenu } from "./airpods-menu";
 import { Prefs } from "./type";
 import {
@@ -33,6 +33,10 @@ export default async function main() {
     console.log("🚀 Starting AirPods Auto Detection...");
     console.log("📋 Original prefs:", prefs);
 
+    // Check if we have a cached successful position from previous runs
+    const cachedPosition = await LocalStorage.getItem<string>("cachedAirPodsPosition");
+    console.log("💾 Cached position from previous runs:", cachedPosition);
+
     // Auto-detect connected AirPods and update configuration
     const detection = await detectConnectedAirPods(prefs);
     console.log("🔍 Detection result:", detection);
@@ -49,11 +53,15 @@ export default async function main() {
     );
     console.log("🎛️ Default options:", defaultOptions);
 
+    // Use cached position if available, otherwise fall back to detection result
+    const effectivePosition = cachedPosition ? parseInt(cachedPosition) : detection.position;
+    console.log(`🎯 Using position: ${effectivePosition} (${cachedPosition ? 'cached' : 'detected'})`);
+
     // Create updated preferences with auto-detected values
-    // FORCE auto-detected values to override any cached preferences (keyboard shortcut fix)
+    // Use cached position initially to avoid double Control Center opening
     const updatedPrefs: Prefs = {
       ...prefs,
-      airpodsIndex: detection.position, // Now using dynamic position!
+      airpodsIndex: effectivePosition, // Use cached position if available
       airpodsType: detection.airpodsType,
       // CRITICAL: Always use auto-detected defaults to prevent keyboard shortcut cache issues
       optionOne: defaultOptions.optionOne,
@@ -62,41 +70,61 @@ export default async function main() {
 
     console.log("📋 Final prefs for AppleScript:", updatedPrefs);
     console.log(
-      `🎯 Using dynamic position ${detection.position} for ${detection.airpodsType} options: ${defaultOptions.optionOne} ↔ ${defaultOptions.optionTwo}`,
+      `🎯 Using ${cachedPosition ? 'cached' : 'detected'} position ${effectivePosition} for ${detection.airpodsType} options: ${defaultOptions.optionOne} ↔ ${defaultOptions.optionTwo}`,
     );
 
-    // First attempt: Try with detected position
+    // First attempt: Try with cached/default position (ONLY opens Control Center once)
+    console.log("🚀 Attempting toggle with cached position...");
     const res = await execAirPodsMenu(updatedPrefs, "noise-control");
     
-    // Check if the toggle failed (might indicate wrong position due to lingering devices)
-    if (!res || res.includes("🔴 No Change") || res.includes("airpods-not-connected")) {
-      console.log("⚠️ First attempt failed, rescanning position...");
+    // Check if the toggle failed - execAirPodsMenu returns null on failure
+    if (!res) {
+      console.log("⚠️ First attempt failed - taking a breather before rescanning...");
       
-      // Fallback: Rescan the position and try again
+      // Give it a moment to settle - Control Center needs time to close properly
+      await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second pause
+      
+      console.log("🔄 Now scanning for correct position using the original working method...");
+      
+      // Use the original working approach: scan FIRST, then click
       const rescannedPosition = await getActiveDevicePosition(prefs);
-      console.log("🔄 Rescanned position:", rescannedPosition);
+      console.log("✅ Rescanned position found:", rescannedPosition);
       
-      if (rescannedPosition !== detection.position) {
-        console.log(`🔧 Position changed from ${detection.position} to ${rescannedPosition}, retrying...`);
+      // Update the preferences with the newly scanned position
+      const retryPrefs: Prefs = {
+        ...updatedPrefs,
+        airpodsIndex: rescannedPosition,
+      };
+      
+      console.log(`🔧 Retrying with rescanned position ${rescannedPosition} using scan-first approach...`);
+      
+      // Give another small pause before the retry to ensure clean state
+      await new Promise(resolve => setTimeout(resolve, 1000)); // 1 second pause
+      
+      const retryRes = await execAirPodsMenu(retryPrefs, "noise-control");
+      
+      if (retryRes) {
+        // Success on retry - UPDATE THE CACHED POSITION FOR NEXT TIME!
+        console.log(`🎯 Success! Updating cached position from ${effectivePosition} to ${rescannedPosition} for future runs`);
         
-        const retryPrefs: Prefs = {
-          ...updatedPrefs,
-          airpodsIndex: rescannedPosition,
-        };
+        // Save the correct position to LocalStorage so next time we use it
+        await LocalStorage.setItem("cachedAirPodsPosition", rescannedPosition.toString());
+        await LocalStorage.setItem("lastSuccessfulPosition", rescannedPosition.toString());
         
-        const retryRes = await execAirPodsMenu(retryPrefs, "noise-control");
-        
-        if (prefs.showHudNC && retryRes) {
-          showHUD(`${retryRes} (${detection.airpodsType}) - Position Fixed`);
-        } else {
-          showHUD("❌ Toggle failed even after position rescan");
+        if (prefs.showHudNC) {
+          const positionNote = rescannedPosition !== effectivePosition ? " - Position Fixed & Saved" : " - Retry Success";
+          showHUD(`${retryRes} (${detection.airpodsType})${positionNote}`);
         }
       } else {
-        console.log("🤷 Position unchanged, might be a different issue");
-        showHUD("❌ Toggle failed - check AirPods connection");
+        // Still failed after retry
+        console.log("❌ Both attempts failed even with proper timing");
+        showHUD(`❌ Toggle failed - position ${effectivePosition}→${rescannedPosition}`);
       }
     } else {
-      // Success on first try
+      // Success on first try - also cache this position as successful
+      console.log(`✅ First attempt succeeded with position ${effectivePosition}`);
+      await LocalStorage.setItem("cachedAirPodsPosition", effectivePosition.toString());
+      
       if (prefs.showHudNC && res) {
         showHUD(`${res} (${detection.airpodsType})`);
       }
