@@ -30,15 +30,15 @@ on getOptionIndex(Opt, deviceType)
 			return 0
 		end if
 	else
-		-- AirPods Pro: Transparency=1, Adaptive=2, Noise Cancellation=3, Off=0
-		if Opt is equal to "Transparency" then
+		-- AirPods Pro: Off=1, Transparency=2, Adaptive=3, Noise Cancellation=4
+		if Opt is equal to "Off" then
 			return 1
-		else if Opt is equal to "Adaptive" then
+		else if Opt is equal to "Transparency" then
 			return 2
-		else if Opt is equal to "Noise Cancellation" then
+		else if Opt is equal to "Adaptive" then
 			return 3
-		else if Opt is equal to "Off" then
-			return 0
+		else if Opt is equal to "Noise Cancellation" then
+			return 4
 		else
 			return 0
 		end if
