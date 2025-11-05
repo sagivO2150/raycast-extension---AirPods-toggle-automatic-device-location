@@ -11,7 +11,6 @@ import path from "path";
 
 // Cross-process lock file path
 const LOCK_PATH = path.join("/tmp", "raycast-airpods-toggle.lock");
-const LOCK_TIMEOUT_MS = 10000; // 10 seconds - if lock is older than this, it's stale
 
 // Helper function to check if a process is running
 function isProcessRunning(pid: number): boolean {
@@ -25,6 +24,7 @@ function isProcessRunning(pid: number): boolean {
 }
 
 // Helper function to clean up stale lock files
+// ONLY cleans locks from dead processes - never touches locks from running processes
 function cleanStaleLock(): boolean {
   if (!fs.existsSync(LOCK_PATH)) {
     return true; // No lock, we're good
@@ -36,20 +36,12 @@ function cleanStaleLock(): boolean {
     
     // Check if the process is still running
     if (!isNaN(lockPid) && isProcessRunning(lockPid)) {
-      // Process is still running, check age of lock file
-      const stats = fs.statSync(LOCK_PATH);
-      const lockAge = Date.now() - stats.mtimeMs;
-      
-      if (lockAge > LOCK_TIMEOUT_MS) {
-        console.log(`⚠️ Lock file is ${Math.round(lockAge/1000)}s old (stale), removing it`);
-        fs.unlinkSync(LOCK_PATH);
-        return true;
-      }
-      
-      console.log(`⏸️ Process ${lockPid} is still running (${Math.round(lockAge/1000)}s), respecting lock`);
+      // Process is ALIVE - always respect the lock, no matter the age
+      // This ensures fast toggling works without interference
+      console.log(`⏸️ Process ${lockPid} is still running, respecting lock`);
       return false;
     } else {
-      // Process is not running, lock is stale
+      // Process is DEAD - lock is definitely stale, safe to remove
       console.log(`🧹 Cleaning up stale lock file (process ${lockPid} not running)`);
       fs.unlinkSync(LOCK_PATH);
       return true;
