@@ -11,13 +11,68 @@ import path from "path";
 
 // Cross-process lock file path
 const LOCK_PATH = path.join("/tmp", "raycast-airpods-toggle.lock");
+const LOCK_TIMEOUT_MS = 10000; // 10 seconds - if lock is older than this, it's stale
+
+// Helper function to check if a process is running
+function isProcessRunning(pid: number): boolean {
+  try {
+    // Signal 0 doesn't kill the process, just checks if it exists
+    process.kill(pid, 0);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+// Helper function to clean up stale lock files
+function cleanStaleLock(): boolean {
+  if (!fs.existsSync(LOCK_PATH)) {
+    return true; // No lock, we're good
+  }
+
+  try {
+    const lockContent = fs.readFileSync(LOCK_PATH, "utf8");
+    const lockPid = parseInt(lockContent.trim());
+    
+    // Check if the process is still running
+    if (!isNaN(lockPid) && isProcessRunning(lockPid)) {
+      // Process is still running, check age of lock file
+      const stats = fs.statSync(LOCK_PATH);
+      const lockAge = Date.now() - stats.mtimeMs;
+      
+      if (lockAge > LOCK_TIMEOUT_MS) {
+        console.log(`⚠️ Lock file is ${Math.round(lockAge/1000)}s old (stale), removing it`);
+        fs.unlinkSync(LOCK_PATH);
+        return true;
+      }
+      
+      console.log(`⏸️ Process ${lockPid} is still running (${Math.round(lockAge/1000)}s), respecting lock`);
+      return false;
+    } else {
+      // Process is not running, lock is stale
+      console.log(`🧹 Cleaning up stale lock file (process ${lockPid} not running)`);
+      fs.unlinkSync(LOCK_PATH);
+      return true;
+    }
+  } catch (e) {
+    // If we can't read the lock file, just remove it
+    console.log("🧹 Cleaning up invalid lock file");
+    try {
+      fs.unlinkSync(LOCK_PATH);
+    } catch (unlinkError) {
+      // Ignore
+    }
+    return true;
+  }
+}
 
 export default async function main() {
-  // Cross-process lock: check if lock file exists
-  if (fs.existsSync(LOCK_PATH)) {
-    console.log("⏸️ Execution already in progress (lock file), skipping...");
+  // Clean up stale locks before checking
+  if (!cleanStaleLock()) {
+    console.log("⏸️ Execution already in progress, skipping...");
     return;
   }
+  
   // Try to create the lock file
   try {
     fs.writeFileSync(LOCK_PATH, String(process.pid));
