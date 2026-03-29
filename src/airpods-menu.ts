@@ -1,7 +1,7 @@
 import { runAppleScript, showFailureToast } from "@raycast/utils";
 import { Prefs } from "./type";
 import { updateCommandMetadata } from "@raycast/api";
-import { isSequoia } from "./utils";
+import { isSequoia, hasOffMode } from "./utils";
 
 // AirPods Max support successfully implemented
 // Status: FULLY WORKING! Both typing commands and keyboard shortcuts tested and working!
@@ -12,6 +12,7 @@ export async function execAirPodsMenu(
   toggleOption = "",
 ): Promise<string | null> {
   const expandToggleIndex = isSequoia() ? "(i + 1)" : "(i - 1)";
+  const offModeExists = hasOffMode();
   const script = `
 set AirPodsIndex to ${airpodsIndex}
 set ToggleOption to "${toggleOption}"
@@ -19,7 +20,7 @@ set AirPodsType to "${airpodsType}"
 
 on getOptionIndex(Opt, deviceType)
 	if deviceType is equal to "AirPods Max" then
-		-- AirPods Max: Off=1, Transparency=2, Noise Cancellation=3
+${offModeExists ? `		-- AirPods Max (pre-macOS 26): Off=1, Transparency=2, Noise Cancellation=3
 		if Opt is equal to "Off" then
 			return 1
 		else if Opt is equal to "Transparency" then
@@ -28,9 +29,16 @@ on getOptionIndex(Opt, deviceType)
 			return 3
 		else
 			return 0
-		end if
+		end if` : `		-- AirPods Max (macOS 26+): Transparency=1, Noise Cancellation=2 (no Off)
+		if Opt is equal to "Transparency" then
+			return 1
+		else if Opt is equal to "Noise Cancellation" then
+			return 2
+		else
+			return 0
+		end if`}
 	else
-		-- AirPods Pro: Off=1, Transparency=2, Adaptive=3, Noise Cancellation=4
+${offModeExists ? `		-- AirPods Pro (pre-macOS 26): Off=1, Transparency=2, Adaptive=3, Noise Cancellation=4
 		if Opt is equal to "Off" then
 			return 1
 		else if Opt is equal to "Transparency" then
@@ -41,7 +49,16 @@ on getOptionIndex(Opt, deviceType)
 			return 4
 		else
 			return 0
-		end if
+		end if` : `		-- AirPods Pro (macOS 26+): Transparency=1, Adaptive=2, Noise Cancellation=3 (no Off)
+		if Opt is equal to "Transparency" then
+			return 1
+		else if Opt is equal to "Adaptive" then
+			return 2
+		else if Opt is equal to "Noise Cancellation" then
+			return 3
+		else
+			return 0
+		end if`}
 	end if
 end getOptionIndex
 
