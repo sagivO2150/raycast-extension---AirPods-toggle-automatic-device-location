@@ -17,11 +17,4 @@ export function isSequoia() {
   return getDarwinMajorVersion() === 24;
 }
 
-export function hasOffMode() {
-  if (!isDarwin()) return true;
 
-  // macOS 26+ (Darwin 25+) removed the "Off" option from noise control modes.
-  // Modes are now: Transparency=1, Adaptive=2, Noise Cancellation=3
-  // Previous versions had: Off=1, Transparency=2, Adaptive=3, Noise Cancellation=4
-  return getDarwinMajorVersion() < 25;
-}

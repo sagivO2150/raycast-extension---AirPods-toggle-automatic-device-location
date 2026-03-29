@@ -4,7 +4,7 @@ import { Prefs } from "./type";
 export interface AirPodsDetectionResult {
   isConnected: boolean;
   deviceName?: string;
-  airpodsType?: "AirPods Pro" | "AirPods Max";
+  airpodsType?: "AirPods Pro" | "AirPods Max" | "AirPods 4";
   position: number;
 }
 
@@ -287,9 +287,10 @@ export async function detectConnectedAirPods(
       console.log("✅ Contains 'airpods'");
 
       const containsMax = cleanDeviceName.toLowerCase().includes("max");
-      console.log("🔍 Contains 'max':", containsMax);
+      const contains4 = /airpods\s*4/i.test(cleanDeviceName);
+      console.log("🔍 Contains 'max':", containsMax, "Contains '4':", contains4);
 
-      const airpodsType = containsMax ? "AirPods Max" : "AirPods Pro";
+      const airpodsType: "AirPods Pro" | "AirPods Max" | "AirPods 4" = containsMax ? "AirPods Max" : contains4 ? "AirPods 4" : "AirPods Pro";
       console.log("🎯 Detected type:", airpodsType);
 
       // Step 2: ONLY scan for position if we don't have a cached preference position
@@ -347,25 +348,16 @@ export async function detectConnectedAirPods(
 }
 
 export function getDefaultOptionsForAirPodsType(
-  airpodsType: "AirPods Pro" | "AirPods Max",
+  airpodsType: "AirPods Pro" | "AirPods Max" | "AirPods 4",
 ): {
   optionOne: string;
   optionTwo: string;
 } {
   console.log("🎛️ Getting default options for:", airpodsType);
 
-  if (airpodsType === "AirPods Max") {
-    console.log("🎧 AirPods Max: Using Noise Cancellation ↔ Transparency");
-    return {
-      optionOne: "Noise Cancellation",
-      optionTwo: "Transparency",
-    };
-  } else {
-    // AirPods Pro
-    console.log("🎧 AirPods Pro: Using Noise Cancellation ↔ Transparency");
-    return {
-      optionOne: "Noise Cancellation",
-      optionTwo: "Transparency",
-    };
-  }
+  console.log(`🎧 ${airpodsType}: Using Noise Cancellation ↔ Transparency`);
+  return {
+    optionOne: "Noise Cancellation",
+    optionTwo: "Transparency",
+  };
 }
