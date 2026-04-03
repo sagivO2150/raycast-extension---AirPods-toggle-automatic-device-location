@@ -1,7 +1,6 @@
 import { runAppleScript, showFailureToast } from "@raycast/utils";
 import { Prefs } from "./type";
 import { updateCommandMetadata } from "@raycast/api";
-import { isSequoia } from "./utils";
 
 // AirPods Max support successfully implemented
 // Status: FULLY WORKING! Both typing commands and keyboard shortcuts tested and working!
@@ -11,7 +10,6 @@ export async function execAirPodsMenu(
   { airpodsIndex, soundLoc, ccLoc, optionOne, optionTwo, airpodsType }: Prefs,
   toggleOption = "",
 ): Promise<string | null> {
-  const expandToggleIndex = isSequoia() ? "(i + 1)" : "(i - 1)";
   const script = `
 set AirPodsIndex to ${airpodsIndex}
 set ToggleOption to "${toggleOption}"
@@ -78,13 +76,40 @@ tell application "System Events"
 			try
 				set menuBar to (first menu bar item whose description is "${soundLoc}") of menu bar 1
 				tell menuBar to click
-				delay 0.1
-				set btMenu to (scroll area 1 of group 1 of window "${ccLoc}")
+				delay 0.3
+				try
+					set btMenu to (scroll area 1 of group 1 of window "${ccLoc}")
+				on error
+					set btMenu to (scroll area 1 of group 1 of window 1)
+				end try
 			on error
-				set menuBar to (first menu bar item whose description is "${ccLoc}") of menu bar 1
+				try
+					set menuBar to (first menu bar item whose description is "${ccLoc}") of menu bar 1
+				on error
+					set foundCC to false
+					repeat with ccAlt in {"Control Centre", "Kontrollzentrum", "Centre de contrôle"}
+						try
+							set menuBar to (first menu bar item whose description is ccAlt) of menu bar 1
+							set foundCC to true
+							exit repeat
+						end try
+					end repeat
+					if not foundCC then
+						return "control-center-not-found"
+					end if
+				end try
 				tell menuBar to click
-				delay 0.1
-				set ccMenuElements to entire contents of window "${ccLoc}"
+				delay 0.3
+				set ccMenuElements to missing value
+				try
+					set ccMenuElements to entire contents of window "${ccLoc}"
+				on error
+					try
+						set ccMenuElements to entire contents of window 1
+					on error
+						return "control-center-not-found"
+					end try
+				end try
 				repeat with i from 1 to length of ccMenuElements
 					set currentItem to properties of item i of ccMenuElements
 					if value of currentItem is equal to "${soundLoc}" then
@@ -100,7 +125,11 @@ tell application "System Events"
 				set soundWindowButton to item soundWindowButtonIndex of ccMenuElements
 				tell soundWindowButton to click
 				delay 1
-				set btMenu to (scroll area 1 of group 1 of window "${ccLoc}")
+				try
+					set btMenu to (scroll area 1 of group 1 of window "${ccLoc}")
+				on error
+					set btMenu to (scroll area 1 of group 1 of window 1)
+				end try
 			end try
 			set btMenuElements to entire contents of btMenu
 			set btCheckbox to (checkbox AirPodsIndex of btMenu)
@@ -109,11 +138,33 @@ tell application "System Events"
 				repeat with i from 1 to length of btMenuElements
 					set currentItem to item i of btMenuElements
 					if currentItem is equal to btCheckbox then
-						set givenIndex to i -- store the index
-						exit repeat -- exit the loop
+						set givenIndex to i
+						exit repeat
 					end if
 				end repeat
-				set expandToggle to item ${expandToggleIndex} of btMenuElements
+				
+				-- Find the expand/disclosure toggle dynamically
+				set expandToggle to missing value
+				repeat with testOffset in {-1, 1}
+					try
+						set testItem to item (givenIndex + testOffset) of btMenuElements
+						if (class of testItem) is not checkbox then
+							set expandToggle to testItem
+							exit repeat
+						end if
+					on error
+						-- Position doesn't exist, try next direction
+					end try
+				end repeat
+				
+				if expandToggle is missing value then
+					tell menuBar to click
+					if soundWindowIndex is not equal to -1 then
+						tell menuBar to click
+					end if
+					return "control-center-not-found"
+				end if
+				
 				set expandToggleExpanded to value of expandToggle as boolean
 				if expandToggleExpanded is false then
 					click expandToggle
@@ -140,10 +191,12 @@ tell application "System Events"
 			end if
 			return output
 		on error
-			tell menuBar to click
-			if soundWindowIndex is not equal to -1 then
+			try
 				tell menuBar to click
-			end if
+				if soundWindowIndex is not equal to -1 then
+					tell menuBar to click
+				end if
+			end try
 			return "control-center-not-found"
 		end try
 	end tell
@@ -158,24 +211,20 @@ end tell
         await showFailureToast("", {
           title: "Sound not found. Check Localization!",
         });
-
         return null;
       }
       case "control-center-not-found": {
         await showFailureToast("", {
           title: "Control Center not found. Check Localization!",
         });
-
         return null;
       }
       case "airpods-not-connected": {
         await showFailureToast("", { title: "AirPods not connected!" });
-
         return null;
       }
       default: {
         await updateCommandMetadata({ subtitle: `Mode: ${result}` });
-
         return result;
       }
     }
