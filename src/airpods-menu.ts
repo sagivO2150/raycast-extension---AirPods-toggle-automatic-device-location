@@ -29,11 +29,13 @@ on getOptionIndex(Opt, deviceType)
 			return 0
 		end if
 	else if deviceType is equal to "AirPods Max" then
-		-- AirPods Max: Transparency=1, Noise Cancellation=2
-		if Opt is equal to "Transparency" then
+		-- AirPods Max: Off=1, Transparency=2, Noise Cancellation=3
+		if Opt is equal to "Off" then
 			return 1
-		else if Opt is equal to "Noise Cancellation" then
+		else if Opt is equal to "Transparency" then
 			return 2
+		else if Opt is equal to "Noise Cancellation" then
+			return 3
 		else
 			return 0
 		end if
